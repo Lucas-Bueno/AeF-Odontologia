@@ -1,7 +1,7 @@
 name: Build Flet APK
 
 on:
-  workflow_dispatch: # Permite disparar manualmente pelo celular
+  workflow_dispatch:
   push:
     branches: [ main, master ]
 
@@ -18,11 +18,6 @@ jobs:
           distribution: 'zulu'
           java-version: '17'
 
-      - name: Configurar Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          channel: 'stable'
-
       - name: Configurar Python
         uses: actions/setup-python@v5
         with:
@@ -31,8 +26,8 @@ jobs:
       - name: Instalar Flet e dependências
         run: pip install -r requirements.txt
 
-      - name: Compilar APK
-        run: flet build apk
+      - name: Compilar APK (Forçando resposta SIM)
+        run: yes | flet build apk
 
       - name: Disponibilizar APK para Download
         uses: actions/upload-artifact@v4
