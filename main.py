@@ -2,8 +2,6 @@ import flet as ft
 import sqlite3
 import requests
 import threading
-import time
-from datetime import datetime
 from abc import ABC, abstractmethod
 
 # ==========================================
@@ -55,10 +53,10 @@ class SQLiteRepository(IRepository):
         return self.cursor.fetchall()
 
 # ==========================================
-# INTEGRAÇÃO WHATSAPP (Webhook)
+# INTEGRAÇÃO WHATSAPP (Webhook Assíncrono)
 # ==========================================
 def enviar_mensagem_whatsapp(celular, mensagem):
-    # Exemplo genérico de webhook (pode ser Evolution API, Z-API, Twilio, etc)
+    # Exemplo genérico de webhook (Evolution API, Z-API, etc)
     webhook_url = "https://seu-servidor-webhook.com/api/send"
     payload = {
         "number": celular,
@@ -67,10 +65,8 @@ def enviar_mensagem_whatsapp(celular, mensagem):
     try:
         # requests.post(webhook_url, json=payload, timeout=5)
         print(f"[Webhook Fake] Mensagem enviada para {celular}: {mensagem}")
-        return True
     except Exception as e:
         print(f"Erro ao enviar mensagem: {e}")
-        return False
 
 # ==========================================
 # INTERFACE GRÁFICA (Flet - UX)
@@ -81,16 +77,15 @@ def main(page: ft.Page):
     page.window_width = 400
     page.window_height = 700
     page.padding = 20
-    page.fonts = {"RobotoSlab": "https://github.com/google/fonts/raw/main/apache/robotoslab/RobotoSlab%5Bwght%5D.ttf"}
-    page.theme = ft.Theme(font_family="RobotoSlab", color_scheme_seed=ft.colors.TEAL)
+    
+    # Atualizado para ft.Colors no Flet 1.0+
+    page.theme = ft.Theme(color_scheme_seed=ft.Colors.TEAL)
 
-    # Injeção de dependência do banco local
     db = SQLiteRepository()
 
     # --- Componentes de UI ---
     
     def renderizar_dashboard():
-        # Busca agendamentos do dia (Mock simplificado)
         agendamentos = db.fetch("SELECT * FROM agendamentos ORDER BY data_hora DESC LIMIT 5")
         
         lista_cards = []
@@ -102,16 +97,16 @@ def main(page: ft.Page):
                     padding=15,
                     content=ft.Column([
                         ft.Text(f"📅 {ag[3]} - {ag[4]}", weight=ft.FontWeight.BOLD, size=16),
-                        ft.Text(f"Observações: {ag[5]}", color=ft.colors.GREY_700),
+                        ft.Text(f"Observações: {ag[5]}", color=ft.Colors.GREY_700),
                         ft.Row([
                             ft.Chip(
-                                label=ft.Text(ag[6], color=ft.colors.WHITE), 
-                                bgcolor=ft.colors.AMBER_700 if ag[6] == 'Agendado' else ft.colors.GREEN_600
+                                label=ft.Text(ag[6], color=ft.Colors.WHITE), 
+                                bgcolor=ft.Colors.AMBER_700 if ag[6] == 'Agendado' else ft.Colors.GREEN_600
                             ),
                             ft.IconButton(
-                                icon=ft.icons.MESSAGE, 
+                                icon=ft.Icons.MESSAGE, 
                                 tooltip="Enviar Lembrete WhatsApp",
-                                icon_color=ft.colors.GREEN,
+                                icon_color=ft.Colors.GREEN,
                                 on_click=lambda e: disparar_lembrete_manual()
                             )
                         ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN)
@@ -124,20 +119,23 @@ def main(page: ft.Page):
             lista_cards.append(ft.Text("Nenhum agendamento para hoje.", italic=True))
             
         return ft.Column([
-            ft.Text("Consultas Recentes", size=24, weight=ft.FontWeight.BOLD, color=ft.colors.TEAL),
+            ft.Text("Consultas Recentes", size=24, weight=ft.FontWeight.BOLD, color=ft.Colors.TEAL),
             ft.Divider(),
             *lista_cards
         ], scroll=ft.ScrollMode.AUTO, expand=True)
 
     def disparar_lembrete_manual():
-        enviar_mensagem_whatsapp("5511999999999", "Olá! Lembramos da sua consulta amanhã no consultório.")
-        snack = ft.SnackBar(ft.Text("Mensagem enviada com sucesso via Webhook!"), bgcolor=ft.colors.GREEN)
+        # Executa a requisição em background usando threading para NÃO congelar a tela do celular
+        t = threading.Thread(target=enviar_mensagem_whatsapp, args=("5511999999999", "Olá! Lembramos da sua consulta amanhã no consultório."))
+        t.start()
+        
+        snack = ft.SnackBar(ft.Text("Enviando mensagem via Webhook..."), bgcolor=ft.Colors.GREEN)
         page.overlay.append(snack)
         snack.open = True
         page.update()
 
     # --- View de Novo Agendamento ---
-    input_data = ft.TextField(label="Data e Hora (DD/MM/YYYY HH:MM)", prefix_icon=ft.icons.CALENDAR_MONTH)
+    input_data = ft.TextField(label="Data e Hora (DD/MM/YYYY HH:MM)", prefix_icon=ft.Icons.CALENDAR_MONTH)
     input_procedimento = ft.Dropdown(
         label="Procedimento",
         options=[
@@ -163,11 +161,17 @@ def main(page: ft.Page):
         atualizar_tela(0) # Volta para dashboard
 
     view_agendamento = ft.Column([
-        ft.Text("Novo Agendamento", size=24, weight=ft.FontWeight.BOLD, color=ft.colors.TEAL),
+        ft.Text("Novo Agendamento", size=24, weight=ft.FontWeight.BOLD, color=ft.Colors.TEAL),
         input_data,
         input_procedimento,
         input_obs,
-        ft.ElevatedButton("Salvar Consulta", icon=ft.icons.SAVE, on_click=salvar_agendamento, width=400, style=ft.ButtonStyle(bgcolor=ft.colors.TEAL, color=ft.colors.WHITE))
+        ft.ElevatedButton(
+            "Salvar Consulta", 
+            icon=ft.Icons.SAVE, 
+            on_click=salvar_agendamento, 
+            width=400, 
+            style=ft.ButtonStyle(bgcolor=ft.Colors.TEAL, color=ft.Colors.WHITE)
+        )
     ], expand=True)
 
     # --- Navegação Bottom ---
@@ -182,13 +186,18 @@ def main(page: ft.Page):
 
     bottom_nav = ft.NavigationBar(
         destinations=[
-            ft.NavigationDestination(icon=ft.icons.DASHBOARD, label="Dashboard"),
-            ft.NavigationDestination(icon=ft.icons.ADD_ALARM, label="Agendar"),
-            ft.NavigationDestination(icon=ft.icons.PEOPLE, label="Cadastros"),
+            ft.NavigationDestination(icon=ft.Icons.DASHBOARD, label="Dashboard"),
+            ft.NavigationDestination(icon=ft.Icons.ADD_ALARM, label="Agendar"),
+            ft.NavigationDestination(icon=ft.Icons.PEOPLE, label="Cadastros"),
         ],
         on_change=lambda e: atualizar_tela(e.control.selected_index)
     )
 
     page.add(area_conteudo, bottom_nav)
 
-ft.run(main)
+# Try/Except para garantir compatibilidade dependendo de como o Serious Python envelopa o Flet no Android
+if __name__ == "__main__":
+    try:
+        ft.app(target=main)
+    except AttributeError:
+        ft.run(main)
