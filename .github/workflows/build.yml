@@ -1,1 +1,41 @@
+name: Build Flet APK
 
+on:
+  workflow_dispatch: # Permite disparar manualmente pelo celular
+  push:
+    branches: [ main, master ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v4
+
+      - name: Configurar Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Configurar Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Instalar Flet e dependências
+        run: pip install -r requirements.txt
+
+      - name: Compilar APK
+        run: flet build apk
+
+      - name: Disponibilizar APK para Download
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-clinica
+          path: build/apk/**/*.apk
