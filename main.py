@@ -191,4 +191,4 @@ def main(page: ft.Page):
 
     page.add(area_conteudo, bottom_nav)
 
-ft.app(target=main)
+ft.run(main)
